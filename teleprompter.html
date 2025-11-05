@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teleprompter</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- jQuery from CDN with integrity check -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha512-v2CJ7UaYy4JwqLDIrZUI/4hqeoQieOmAZNXBeQyjo21dadnwR+8ZaIJVT8EE2iyI61OV8e6M8PP2/4hpQINQ/g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #1a1a1a;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+        
+        .control-panel {
+            background-color: #2c2c2c;
+            padding: 20px;
+            border-bottom: 2px solid #444;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+        }
+        
+        .teleprompter-container {
+            margin-top: 200px;
+            min-height: 100vh;
+            padding: 40px;
+            background-color: #000000;
+        }
+        
+        #teleprompter-display {
+            font-size: 48px;
+            line-height: 1.8;
+            text-align: center;
+            padding: 100px 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .edit-mode {
+            background-color: #f8f9fa;
+            color: #212529;
+        }
+        
+        #script-input {
+            width: 100%;
+            min-height: 400px;
+            font-size: 18px;
+            padding: 20px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            background-color: #ffffff;
+            color: #212529;
+        }
+        
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .btn-control {
+            min-width: 100px;
+        }
+        
+        .mirror-mode {
+            transform: scaleX(-1);
+        }
+        
+        .guide-line {
+            position: fixed;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background-color: rgba(255, 0, 0, 0.3);
+            top: 50%;
+            z-index: 500;
+            pointer-events: none;
+            display: none;
+        }
+        
+        .guide-line.active {
+            display: block;
+        }
+        
+        .fullscreen-mode .control-panel {
+            display: none;
+        }
+        
+        .fullscreen-mode .teleprompter-container {
+            margin-top: 0;
+            padding-top: 200px;
+        }
+        
+        .settings-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .font-size-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #font-size-display {
+            min-width: 50px;
+            text-align: center;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- Guide Line -->
+    <div class="guide-line" id="guideLine"></div>
+    
+    <!-- Control Panel -->
+    <div class="control-panel">
+        <div class="container-fluid">
+            <div class="row mb-3">
+                <div class="col-12">
+                    <h2 class="text-white mb-0">Teleprompter</h2>
+                </div>
+            </div>
+            
+            <div class="settings-row">
+                <!-- Play Controls -->
+                <div class="speed-control">
+                    <button id="playBtn" class="btn btn-success btn-control">
+                        <span class="play-text">▶ Play</span>
+                    </button>
+                    <button id="resetBtn" class="btn btn-warning btn-control">↺ Reset</button>
+                </div>
+                
+                <!-- Speed Control -->
+                <div class="speed-control">
+                    <label class="text-white mb-0">Speed:</label>
+                    <input type="range" id="speedSlider" class="form-range" min="1" max="200" value="30" style="width: 150px;">
+                    <span id="speedValue" class="badge bg-info">30</span>
+                </div>
+                
+                <!-- Font Size Control -->
+                <div class="font-size-control">
+                    <label class="text-white mb-0">Font Size:</label>
+                    <button id="fontDecrease" class="btn btn-sm btn-secondary">-</button>
+                    <span id="font-size-display" class="text-white">48px</span>
+                    <button id="fontIncrease" class="btn btn-sm btn-secondary">+</button>
+                </div>
+                
+                <!-- Toggle Buttons -->
+                <div class="btn-group" role="group">
+                    <button id="editBtn" class="btn btn-primary">✏ Edit Script</button>
+                    <button id="mirrorBtn" class="btn btn-outline-light">🔄 Mirror</button>
+                    <button id="guideBtn" class="btn btn-outline-light">📍 Guide</button>
+                    <button id="fullscreenBtn" class="btn btn-outline-light">⛶ Fullscreen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Teleprompter Display -->
+    <div class="teleprompter-container" id="teleprompterContainer">
+        <div id="edit-section" style="display: none;">
+            <div class="container">
+                <div class="row">
+                    <div class="col-12">
+                        <h3 class="mb-3">Enter Your Script</h3>
+                        <textarea id="script-input" class="form-control" placeholder="Paste or type your script here...">Welcome to the Teleprompter!
+
+This is a sample script to help you get started. You can replace this text with your own script by clicking the Edit Script button.
+
+The teleprompter offers several features:
+- Adjustable scrolling speed
+- Font size control
+- Mirror mode for use with beam splitters
+- Guide line to help you maintain reading position
+- Fullscreen mode for distraction-free reading
+- PPT slide clicker support for hands-free speed control
+
+To begin:
+1. Click "Edit Script" to enter your text
+2. Adjust the font size to your preference
+3. Set your desired scrolling speed
+4. Press Play to start the teleprompter
+5. Use the space bar to pause/resume at any time
+6. Use your PPT clicker: Next button increases speed, Back button decreases speed
+
+Happy presenting!</textarea>
+                        <div class="mt-3">
+                            <button id="saveScript" class="btn btn-success btn-lg">Save and Start Reading</button>
+                            <button id="cancelEdit" class="btn btn-secondary btn-lg ms-2">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="teleprompter-display">Welcome to the Teleprompter!
+
+This is a sample script to help you get started. You can replace this text with your own script by clicking the Edit Script button.
+
+The teleprompter offers several features:
+- Adjustable scrolling speed
+- Font size control
+- Mirror mode for use with beam splitters
+- Guide line to help you maintain reading position
+- Fullscreen mode for distraction-free reading
+- PPT slide clicker support for hands-free speed control
+
+To begin:
+1. Click "Edit Script" to enter your text
+2. Adjust the font size to your preference
+3. Set your desired scrolling speed
+4. Press Play to start the teleprompter
+5. Use the space bar to pause/resume at any time
+6. Use your PPT clicker: Next button increases speed, Back button decreases speed
+
+Happy presenting!</div>
+    </div>
+    
+    <script>
+        // Check if jQuery loaded, if not, use vanilla JavaScript
+        if (typeof jQuery === 'undefined') {
+            console.log('jQuery failed to load, using vanilla JavaScript');
+            document.addEventListener('DOMContentLoaded', function() {
+                initTeleprompterVanilla();
+            });
+        } else {
+            $(document).ready(function() {
+            let isPlaying = false;
+            let scrollInterval;
+            let currentFontSize = 48;
+            let isEditMode = false;
+            let isMirrorMode = false;
+            let isGuideActive = false;
+            let isFullscreen = false;
+            
+            // Play/Pause functionality
+            $('#playBtn').click(function() {
+                if (isPlaying) {
+                    pauseScrolling();
+                } else {
+                    startScrolling();
+                }
+            });
+            
+            // Start scrolling
+            function startScrolling() {
+                isPlaying = true;
+                $('#playBtn').html('<span class="play-text">⏸ Pause</span>');
+                $('#playBtn').removeClass('btn-success').addClass('btn-danger');
+                
+                const speed = parseInt($('#speedSlider').val());
+                let scrollSpeed, scrollAmount;
+                
+                if (speed <= 100) {
+                    // For speeds 1-100, adjust interval delay
+                    scrollSpeed = 101 - speed; // 100ms to 1ms
+                    scrollAmount = 1;
+                } else {
+                    // For speeds 101-200, keep 1ms interval but scroll multiple pixels
+                    scrollSpeed = 1;
+                    scrollAmount = speed - 99; // 2 to 101 pixels
+                }
+                
+                scrollInterval = setInterval(function() {
+                    $(window).scrollTop($(window).scrollTop() + scrollAmount);
+                    
+                    // Stop when reaching bottom
+                    if ($(window).scrollTop() + $(window).height() >= $(document).height()) {
+                        pauseScrolling();
+                    }
+                }, scrollSpeed);
+            }
+            
+            // Pause scrolling
+            function pauseScrolling() {
+                isPlaying = false;
+                $('#playBtn').html('<span class="play-text">▶ Play</span>');
+                $('#playBtn').removeClass('btn-danger').addClass('btn-success');
+                clearInterval(scrollInterval);
+            }
+            
+            // Reset position
+            $('#resetBtn').click(function() {
+                pauseScrolling();
+                $(window).scrollTop(0);
+            });
+            
+            // Speed control
+            $('#speedSlider').on('input', function() {
+                const speed = $(this).val();
+                $('#speedValue').text(speed);
+                
+                // If currently playing, restart with new speed
+                if (isPlaying) {
+                    pauseScrolling();
+                    startScrolling();
+                }
+            });
+            
+            // Font size controls
+            $('#fontIncrease').click(function() {
+                if (currentFontSize < 120) {
+                    currentFontSize += 4;
+                    updateFontSize();
+                }
+            });
+            
+            $('#fontDecrease').click(function() {
+                if (currentFontSize > 20) {
+                    currentFontSize -= 4;
+                    updateFontSize();
+                }
+            });
+            
+            function updateFontSize() {
+                $('#teleprompter-display').css('font-size', currentFontSize + 'px');
+                $('#font-size-display').text(currentFontSize + 'px');
+            }
+            
+            // Edit mode
+            $('#editBtn').click(function() {
+                pauseScrolling();
+                isEditMode = true;
+                $('body').addClass('edit-mode');
+                $('#edit-section').show();
+                $('#teleprompter-display').hide();
+                $('#script-input').val($('#teleprompter-display').text());
+            });
+            
+            $('#saveScript').click(function() {
+                const script = $('#script-input').val();
+                $('#teleprompter-display').text(script);
+                closeEditMode();
+            });
+            
+            $('#cancelEdit').click(function() {
+                closeEditMode();
+            });
+            
+            function closeEditMode() {
+                isEditMode = false;
+                $('body').removeClass('edit-mode');
+                $('#edit-section').hide();
+                $('#teleprompter-display').show();
+                $(window).scrollTop(0);
+            }
+            
+            // Mirror mode
+            $('#mirrorBtn').click(function() {
+                isMirrorMode = !isMirrorMode;
+                if (isMirrorMode) {
+                    $('#teleprompter-display').addClass('mirror-mode');
+                    $(this).removeClass('btn-outline-light').addClass('btn-light');
+                } else {
+                    $('#teleprompter-display').removeClass('mirror-mode');
+                    $(this).removeClass('btn-light').addClass('btn-outline-light');
+                }
+            });
+            
+            // Guide line
+            $('#guideBtn').click(function() {
+                isGuideActive = !isGuideActive;
+                if (isGuideActive) {
+                    $('#guideLine').addClass('active');
+                    $(this).removeClass('btn-outline-light').addClass('btn-light');
+                } else {
+                    $('#guideLine').removeClass('active');
+                    $(this).removeClass('btn-light').addClass('btn-outline-light');
+                }
+            });
+            
+            // Fullscreen mode
+            $('#fullscreenBtn').click(function() {
+                if (!isFullscreen) {
+                    if (document.documentElement.requestFullscreen) {
+                        document.documentElement.requestFullscreen();
+                    } else if (document.documentElement.webkitRequestFullscreen) {
+                        document.documentElement.webkitRequestFullscreen();
+                    } else if (document.documentElement.msRequestFullscreen) {
+                        document.documentElement.msRequestFullscreen();
+                    }
+                    $('body').addClass('fullscreen-mode');
+                    isFullscreen = true;
+                    $(this).removeClass('btn-outline-light').addClass('btn-light');
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    } else if (document.msExitFullscreen) {
+                        document.msExitFullscreen();
+                    }
+                    $('body').removeClass('fullscreen-mode');
+                    isFullscreen = false;
+                    $(this).removeClass('btn-light').addClass('btn-outline-light');
+                }
+            });
+            
+            // Keyboard shortcuts
+            $(document).keydown(function(e) {
+                // Space bar to play/pause
+                if (e.keyCode === 32 && !isEditMode) {
+                    e.preventDefault();
+                    $('#playBtn').click();
+                }
+                // Escape to exit fullscreen
+                if (e.keyCode === 27 && isFullscreen) {
+                    $('#fullscreenBtn').click();
+                }
+                // R to reset
+                if (e.keyCode === 82 && !isEditMode) {
+                    e.preventDefault();
+                    $('#resetBtn').click();
+                }
+                
+                // PPT Clicker Controls - Next button (increase speed)
+                // PageDown (34), Right Arrow (39), Down Arrow (40)
+                if ((e.keyCode === 34 || e.keyCode === 39 || e.keyCode === 40) && !isEditMode) {
+                    e.preventDefault();
+                    let currentSpeed = parseInt($('#speedSlider').val());
+                    if (currentSpeed < 200) {
+                        currentSpeed += 5;
+                        $('#speedSlider').val(currentSpeed).trigger('input');
+                    }
+                }
+                
+                // PPT Clicker Controls - Back button (decrease speed)
+                // PageUp (33), Left Arrow (37), Up Arrow (38)
+                if ((e.keyCode === 33 || e.keyCode === 37 || e.keyCode === 38) && !isEditMode) {
+                    e.preventDefault();
+                    let currentSpeed = parseInt($('#speedSlider').val());
+                    if (currentSpeed > 1) {
+                        currentSpeed -= 5;
+                        $('#speedSlider').val(currentSpeed).trigger('input');
+                    }
+                }
+            });
+            
+            // Handle fullscreen change events
+            $(document).on('fullscreenchange webkitfullscreenchange mozfullscreenchange MSFullscreenChange', function() {
+                if (!document.fullscreenElement && !document.webkitFullscreenElement && 
+                    !document.mozFullScreenElement && !document.msFullscreenElement) {
+                    $('body').removeClass('fullscreen-mode');
+                    isFullscreen = false;
+                    $('#fullscreenBtn').removeClass('btn-light').addClass('btn-outline-light');
+                }
+            });
+        });
+        }
+        
+        // Vanilla JavaScript implementation (fallback if jQuery doesn't load)
+        function initTeleprompterVanilla() {
+            let isPlaying = false;
+            let scrollInterval;
+            let currentFontSize = 48;
+            let isEditMode = false;
+            let isMirrorMode = false;
+            let isGuideActive = false;
+            let isFullscreen = false;
+            
+            const playBtn = document.getElementById('playBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const speedSlider = document.getElementById('speedSlider');
+            const speedValue = document.getElementById('speedValue');
+            const fontIncrease = document.getElementById('fontIncrease');
+            const fontDecrease = document.getElementById('fontDecrease');
+            const fontSizeDisplay = document.getElementById('font-size-display');
+            const editBtn = document.getElementById('editBtn');
+            const saveScript = document.getElementById('saveScript');
+            const cancelEdit = document.getElementById('cancelEdit');
+            const mirrorBtn = document.getElementById('mirrorBtn');
+            const guideBtn = document.getElementById('guideBtn');
+            const fullscreenBtn = document.getElementById('fullscreenBtn');
+            const teleprompterDisplay = document.getElementById('teleprompter-display');
+            const editSection = document.getElementById('edit-section');
+            const scriptInput = document.getElementById('script-input');
+            const guideLine = document.getElementById('guideLine');
+            
+            // Play/Pause functionality
+            playBtn.addEventListener('click', function() {
+                if (isPlaying) {
+                    pauseScrolling();
+                } else {
+                    startScrolling();
+                }
+            });
+            
+            // Start scrolling
+            function startScrolling() {
+                isPlaying = true;
+                playBtn.innerHTML = '<span class="play-text">⏸ Pause</span>';
+                playBtn.classList.remove('btn-success');
+                playBtn.classList.add('btn-danger');
+                
+                const speed = parseInt(speedSlider.value);
+                let scrollSpeed, scrollAmount;
+                
+                if (speed <= 100) {
+                    // For speeds 1-100, adjust interval delay
+                    scrollSpeed = 101 - speed; // 100ms to 1ms
+                    scrollAmount = 1;
+                } else {
+                    // For speeds 101-200, keep 1ms interval but scroll multiple pixels
+                    scrollSpeed = 1;
+                    scrollAmount = speed - 99; // 2 to 101 pixels
+                }
+                
+                scrollInterval = setInterval(function() {
+                    window.scrollBy(0, scrollAmount);
+                    
+                    if (window.scrollY + window.innerHeight >= document.documentElement.scrollHeight) {
+                        pauseScrolling();
+                    }
+                }, scrollSpeed);
+            }
+            
+            // Pause scrolling
+            function pauseScrolling() {
+                isPlaying = false;
+                playBtn.innerHTML = '<span class="play-text">▶ Play</span>';
+                playBtn.classList.remove('btn-danger');
+                playBtn.classList.add('btn-success');
+                clearInterval(scrollInterval);
+            }
+            
+            // Reset position
+            resetBtn.addEventListener('click', function() {
+                pauseScrolling();
+                window.scrollTo(0, 0);
+            });
+            
+            // Speed control
+            speedSlider.addEventListener('input', function() {
+                const speed = this.value;
+                speedValue.textContent = speed;
+                
+                if (isPlaying) {
+                    pauseScrolling();
+                    startScrolling();
+                }
+            });
+            
+            // Font size controls
+            fontIncrease.addEventListener('click', function() {
+                if (currentFontSize < 120) {
+                    currentFontSize += 4;
+                    updateFontSize();
+                }
+            });
+            
+            fontDecrease.addEventListener('click', function() {
+                if (currentFontSize > 20) {
+                    currentFontSize -= 4;
+                    updateFontSize();
+                }
+            });
+            
+            function updateFontSize() {
+                teleprompterDisplay.style.fontSize = currentFontSize + 'px';
+                fontSizeDisplay.textContent = currentFontSize + 'px';
+            }
+            
+            // Edit mode
+            editBtn.addEventListener('click', function() {
+                pauseScrolling();
+                isEditMode = true;
+                document.body.classList.add('edit-mode');
+                editSection.style.display = 'block';
+                teleprompterDisplay.style.display = 'none';
+                scriptInput.value = teleprompterDisplay.textContent;
+            });
+            
+            saveScript.addEventListener('click', function() {
+                const script = scriptInput.value;
+                teleprompterDisplay.textContent = script;
+                closeEditMode();
+            });
+            
+            cancelEdit.addEventListener('click', function() {
+                closeEditMode();
+            });
+            
+            function closeEditMode() {
+                isEditMode = false;
+                document.body.classList.remove('edit-mode');
+                editSection.style.display = 'none';
+                teleprompterDisplay.style.display = 'block';
+                window.scrollTo(0, 0);
+            }
+            
+            // Mirror mode
+            mirrorBtn.addEventListener('click', function() {
+                isMirrorMode = !isMirrorMode;
+                if (isMirrorMode) {
+                    teleprompterDisplay.classList.add('mirror-mode');
+                    this.classList.remove('btn-outline-light');
+                    this.classList.add('btn-light');
+                } else {
+                    teleprompterDisplay.classList.remove('mirror-mode');
+                    this.classList.remove('btn-light');
+                    this.classList.add('btn-outline-light');
+                }
+            });
+            
+            // Guide line
+            guideBtn.addEventListener('click', function() {
+                isGuideActive = !isGuideActive;
+                if (isGuideActive) {
+                    guideLine.classList.add('active');
+                    this.classList.remove('btn-outline-light');
+                    this.classList.add('btn-light');
+                } else {
+                    guideLine.classList.remove('active');
+                    this.classList.remove('btn-light');
+                    this.classList.add('btn-outline-light');
+                }
+            });
+            
+            // Fullscreen mode
+            fullscreenBtn.addEventListener('click', function() {
+                if (!isFullscreen) {
+                    if (document.documentElement.requestFullscreen) {
+                        document.documentElement.requestFullscreen();
+                    }
+                    document.body.classList.add('fullscreen-mode');
+                    isFullscreen = true;
+                    this.classList.remove('btn-outline-light');
+                    this.classList.add('btn-light');
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    }
+                    document.body.classList.remove('fullscreen-mode');
+                    isFullscreen = false;
+                    this.classList.remove('btn-light');
+                    this.classList.add('btn-outline-light');
+                }
+            });
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', function(e) {
+                if (e.keyCode === 32 && !isEditMode) {
+                    e.preventDefault();
+                    playBtn.click();
+                }
+                if (e.keyCode === 27 && isFullscreen) {
+                    fullscreenBtn.click();
+                }
+                if (e.keyCode === 82 && !isEditMode) {
+                    e.preventDefault();
+                    resetBtn.click();
+                }
+                
+                // PPT Clicker Controls - Next button (increase speed)
+                // PageDown (34), Right Arrow (39), Down Arrow (40)
+                if ((e.keyCode === 34 || e.keyCode === 39 || e.keyCode === 40) && !isEditMode) {
+                    e.preventDefault();
+                    let currentSpeed = parseInt(speedSlider.value);
+                    if (currentSpeed < 200) {
+                        currentSpeed += 5;
+                        speedSlider.value = currentSpeed;
+                        speedValue.textContent = currentSpeed;
+                        if (isPlaying) {
+                            pauseScrolling();
+                            startScrolling();
+                        }
+                    }
+                }
+                
+                // PPT Clicker Controls - Back button (decrease speed)
+                // PageUp (33), Left Arrow (37), Up Arrow (38)
+                if ((e.keyCode === 33 || e.keyCode === 37 || e.keyCode === 38) && !isEditMode) {
+                    e.preventDefault();
+                    let currentSpeed = parseInt(speedSlider.value);
+                    if (currentSpeed > 1) {
+                        currentSpeed -= 5;
+                        speedSlider.value = currentSpeed;
+                        speedValue.textContent = currentSpeed;
+                        if (isPlaying) {
+                            pauseScrolling();
+                            startScrolling();
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
